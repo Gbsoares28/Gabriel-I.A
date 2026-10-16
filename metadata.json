@@ -1,0 +1,6 @@
+{
+  "name": "Gabriel | Adestrador de Cães e Gatos",
+  "description": "Central inteligente de soluções para tutores e adestradores com Gabriel Soares, especialista em comportamento pet com 10 anos de experiência.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
