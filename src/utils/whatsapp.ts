@@ -1,6 +1,6 @@
 /**
  * WhatsApp Link Centralized Helper
- * Conforms to Section 10:
+ * Conforms to Section 10 & Section 7.6:
  * Format: https://wa.me/NUMERO_COM_DDI?text=TEXTO_CODIFICADO
  * Single reusable configuration with real commercial phone: 5521965107060
  */
@@ -72,7 +72,7 @@ export function buildToyConsultationWhatsAppUrl(details?: {
 }
 
 /**
- * Section 7: Intelligent Pre-Attendance Contextual WhatsApp Message
+ * Section 7.6: Intelligent Pre-Attendance Contextual WhatsApp Message
  */
 export interface PreAttendanceData {
   species?: string;
@@ -86,36 +86,41 @@ export interface PreAttendanceData {
 }
 
 export function buildPreAttendanceMessage(data: PreAttendanceData): string {
-  const parts: string[] = [
-    'Olá, Gabriel! Vim pelo assistente virtual do seu site e gostaria de orientação sobre o comportamento do meu pet.'
-  ];
+  const parts: string[] = [];
 
-  if (data.species && data.species.trim()) {
-    parts.push(`\n\n*Espécie:* ${data.species.trim()}`);
+  const isCat = data.species && data.species.toLowerCase().includes('gato');
+  const isDog = data.species && (data.species.toLowerCase().includes('cão') || data.species.toLowerCase().includes('cao'));
+
+  if (isCat) {
+    parts.push('Olá, Gabriel! Gostaria de orientação sobre o comportamento do meu pet felino.');
+  } else if (isDog) {
+    parts.push('Olá, Gabriel! Gostaria de orientação sobre o comportamento do meu cachorro.');
+  } else {
+    parts.push('Olá, Gabriel! Vim pelo assistente virtual do seu site e gostaria de orientação sobre o comportamento do meu pet.');
   }
+
+  const detailsList: string[] = [];
   if (data.animals && data.animals.trim()) {
-    parts.push(`\n\n*Animais envolvidos:* ${data.animals.trim()}`);
+    detailsList.push(`Animais: ${data.animals.trim()}`);
   }
   if (data.primaryProblem && data.primaryProblem.trim()) {
-    parts.push(`\n\n*Principal dificuldade:* ${data.primaryProblem.trim()}`);
+    detailsList.push(`Situação relatada: ${data.primaryProblem.trim()}`);
   }
   if (data.behaviorDetails && data.behaviorDetails.trim()) {
-    parts.push(`\n\n*Detalhes do comportamento:* ${data.behaviorDetails.trim()}`);
+    detailsList.push(`Comportamentos: ${data.behaviorDetails.trim()}`);
   }
   if (data.onsetOrDuration && data.onsetOrDuration.trim()) {
-    parts.push(`\n\n*Tempo de convivência ou duração do problema:* ${data.onsetOrDuration.trim()}`);
-  }
-  if (data.householdContext && data.householdContext.trim()) {
-    parts.push(`\n\n*Contexto relevante:* ${data.householdContext.trim()}`);
+    detailsList.push(`Tempo de convivência / duração: ${data.onsetOrDuration.trim()}`);
   }
   if (data.neighborhood && data.neighborhood.trim()) {
-    parts.push(`\n\n*Bairro:* ${data.neighborhood.trim()}`);
-  }
-  if (data.conversationSummary && data.conversationSummary.trim()) {
-    parts.push(`\n\n*Resumo da conversa:* ${data.conversationSummary.trim()}`);
+    detailsList.push(`Bairro: ${data.neighborhood.trim()}`);
   }
 
-  parts.push('\n\nGostaria de conversar com você sobre os próximos passos.');
+  if (detailsList.length > 0) {
+    parts.push('\n\n' + detailsList.join('\n'));
+  }
+
+  parts.push('\n\nGostaria de entender quais são os próximos passos para melhorar a convivência.');
 
   return parts.join('');
 }
@@ -131,4 +136,3 @@ export function buildPreAttendanceWhatsAppUrl(data: PreAttendanceData): string {
 export function buildDefaultWhatsAppUrl(defaultMessage?: string): string {
   return buildWhatsAppUrl(defaultMessage || 'Olá, tudo bem? gostaria de saber mais a respeito de adestramento.');
 }
-

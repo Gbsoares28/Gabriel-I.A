@@ -1,29 +1,38 @@
 @import "tailwindcss";
 
 :root {
-  /* Core brand identity extracted from reference image paleta de cores.png */
+  /* Exactly matching https://share.google/5hHPp8HXLvxLwgBgw (Vinho Claro #8d272b) */
   --color-primary: #16a34a; /* Emerald green - Contato WhatsApp */
   --color-secondary: #8b5cf6; /* Violet purple - Mentoria */
   --color-accent: #db2777; /* Rose / Magenta - Clube PetFlow 360 */
-  --color-amber: #f59e0b; /* Amber / Orange - Produtos & Enxoval */
+  --color-wine: #8d272b; /* Vinho Claro from shared Google link */
+  --color-wine-dark: #6f1c20; /* Deep wine shade */
+  --color-wine-light: #a43338; /* Light wine highlight */
   --color-red: #dc2626; /* YouTube red */
-  --color-blue: #2563eb; /* Royal blue - Facebook */
   
-  --color-background: #0f1011;
-  --color-surface: #16171a;
-  --color-surface-hover: #1f2125;
-  --color-border: #26282c;
-  --color-border-hover: #383b42;
+  --color-background: #8d272b;
+  --color-surface: #7a2024;
+  --color-surface-hover: #962a2f;
+  --color-border: #a8363b;
+  --color-border-hover: #bd4348;
   
-  --color-text: #ededed;
-  --color-muted: #8e939b;
+  --color-text: #ffffff;
+  --color-muted: #f5d7d9;
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+    background-color: #8d272b;
+  }
+
   body {
-    background-color: var(--color-background);
+    background-color: #8d272b;
     color: var(--color-text);
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding-bottom: env(safe-area-inset-bottom, 16px);
+    overflow-x: hidden;
   }
 
   h1, h2, .font-serif {
@@ -42,10 +51,10 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.2);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.35);
 }

@@ -25,10 +25,13 @@ export const TestimonialsSection: React.FC<TestimonialsSectionProps> = ({
   const authorizedList = useMemo(() => testimonials.filter((t) => t.authorized), [testimonials]);
 
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [itemsPerPage, setItemsPerPage] = useState(2);
+  const [itemsPerPage, setItemsPerPage] = useState(1);
   const [isPaused, setIsPaused] = useState(false);
+  const [expandedReviews, setExpandedReviews] = useState<Record<string, boolean>>({});
+
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Responsive itemsPerPage calculation
   useEffect(() => {
@@ -56,16 +59,22 @@ export const TestimonialsSection: React.FC<TestimonialsSectionProps> = ({
     }
   }, [totalPages, currentIndex]);
 
-  // Autoplay functionality with pause on hover
+  // Autoplay functionality with pause on hover / touch / while reading expanded review
+  const hasAnyExpanded = Object.values(expandedReviews).some(Boolean);
+
   useEffect(() => {
-    if (isPaused || totalPages <= 1) return;
+    // Check prefers-reduced-motion
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    if (mediaQuery.matches) return;
+
+    if (isPaused || hasAnyExpanded || totalPages <= 1) return;
 
     const timer = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % totalPages);
-    }, 6000);
+    }, 4800);
 
     return () => clearInterval(timer);
-  }, [isPaused, totalPages]);
+  }, [isPaused, hasAnyExpanded, totalPages]);
 
   const handlePrev = () => {
     setCurrentIndex((prev) => (prev === 0 ? totalPages - 1 : prev - 1));
@@ -75,8 +84,16 @@ export const TestimonialsSection: React.FC<TestimonialsSectionProps> = ({
     setCurrentIndex((prev) => (prev + 1) % totalPages);
   };
 
+  const toggleExpandReview = (id: string) => {
+    setExpandedReviews((prev) => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
+
   // Touch swipe support
   const handleTouchStart = (e: React.TouchEvent) => {
+    setIsPaused(true);
     touchStartX.current = e.targetTouches[0].clientX;
   };
 
@@ -85,11 +102,12 @@ export const TestimonialsSection: React.FC<TestimonialsSectionProps> = ({
   };
 
   const handleTouchEnd = () => {
+    setIsPaused(false);
     if (!touchStartX.current || !touchEndX.current) return;
     const diff = touchStartX.current - touchEndX.current;
-    if (diff > 50) {
+    if (diff > 45) {
       handleNext();
-    } else if (diff < -50) {
+    } else if (diff < -45) {
       handlePrev();
     }
     touchStartX.current = null;
@@ -100,58 +118,52 @@ export const TestimonialsSection: React.FC<TestimonialsSectionProps> = ({
 
   return (
     <section
-      className="space-y-6 pt-6 select-none"
+      className="space-y-4 sm:space-y-5 pt-2 select-none"
       aria-label="Depoimentos e Avaliações de Clientes"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
-      {/* Header & Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+      {/* Header & Controls (Section 6: rating summary 5.0 / 18 reviews completely removed) */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 text-center sm:text-left">
         <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-[12px] font-bold uppercase tracking-wider text-emerald-400">
-              TRANSFORMAÇÕES REAIS
-            </span>
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-neutral-400 bg-[#1e2024] px-2.5 py-0.5 rounded-full border border-[#2a2d33]">
-              <Star className="w-3 h-3 text-[#ea580c] fill-[#ea580c]" />
-              <span>5.0 • {authorizedList.length} avaliações</span>
-            </span>
-          </div>
+          <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-emerald-400 block mb-1">
+            TRANSFORMAÇÕES REAIS
+          </span>
 
-          <h2 className="text-3xl sm:text-4xl lg:text-[44px] font-bold text-white tracking-tight leading-tight font-serif">
+          <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight leading-tight font-serif">
             O que dizem os clientes
           </h2>
-          <p className="text-sm sm:text-base text-[#8e939b] mt-1.5 max-w-xl leading-relaxed">
-            Resultados construídos com paciência, técnica positiva e respeito mútuo ao tempo de cada cão e gato.
+          <p className="text-xs sm:text-sm text-neutral-300/80 mt-1 max-w-xl leading-relaxed">
+            Resultados construídos com paciência, técnica positiva e respeito ao tempo de cada animal.
           </p>
         </div>
 
         {/* Action button & Navigation arrows */}
-        <div className="flex items-center gap-3 self-start sm:self-auto">
+        <div className="flex items-center justify-center sm:justify-end gap-2.5 self-center sm:self-auto pt-1 sm:pt-0">
           <a
             href={config.instagramUrl || 'https://www.instagram.com/gabrieltreinadordeanimais/'}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-semibold bg-[#18191b] hover:bg-[#222428] border border-[#26282c] text-neutral-300 hover:text-white transition-all group"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-[#18191b]/90 hover:bg-[#222428] border border-white/10 text-neutral-200 hover:text-white transition-all group backdrop-blur-sm"
           >
-            <Instagram className="w-3.5 h-3.5 text-[#ea580c]" />
-            <span className="hidden xs:inline">Instagram</span>
-            <ArrowUpRight className="w-3.5 h-3.5 text-neutral-400 group-hover:text-white transition-transform" />
+            <Instagram className="w-3.5 h-3.5 text-pink-500" />
+            <span>Instagram</span>
+            <ArrowUpRight className="w-3 h-3 text-neutral-400 group-hover:text-white transition-transform" />
           </a>
 
           {/* Prev / Next Buttons */}
-          <div className="flex items-center gap-1.5 bg-[#18191b] p-1 rounded-full border border-[#26282c]">
+          <div className="flex items-center gap-1 bg-[#18191b]/90 p-1 rounded-full border border-white/10 backdrop-blur-sm">
             <button
               onClick={handlePrev}
               aria-label="Depoimento anterior"
-              className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-300 hover:text-white hover:bg-[#25282d] active:scale-95 transition-all"
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-neutral-300 hover:text-white hover:bg-white/10 active:scale-95 transition-all cursor-pointer"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
             <button
               onClick={handleNext}
               aria-label="Próximo depoimento"
-              className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-300 hover:text-white hover:bg-[#25282d] active:scale-95 transition-all"
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-neutral-300 hover:text-white hover:bg-white/10 active:scale-95 transition-all cursor-pointer"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -161,13 +173,14 @@ export const TestimonialsSection: React.FC<TestimonialsSectionProps> = ({
 
       {/* Modern Compact Carousel Container */}
       <div
-        className="relative overflow-hidden rounded-[26px]"
+        ref={containerRef}
+        className="relative overflow-hidden rounded-[22px]"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
         <div
-          className="flex transition-transform duration-500 ease-out"
+          className="flex transition-transform duration-500 ease-out will-change-transform"
           style={{
             transform: `translateX(-${currentIndex * 100}%)`
           }}
@@ -181,127 +194,141 @@ export const TestimonialsSection: React.FC<TestimonialsSectionProps> = ({
             return (
               <div
                 key={pageIdx}
-                className="w-full shrink-0 grid gap-4"
+                className="w-full shrink-0 grid gap-3 sm:gap-4"
                 style={{
                   gridTemplateColumns: `repeat(${itemsPerPage}, minmax(0, 1fr))`
                 }}
               >
-                {pageItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="p-5 sm:p-6 rounded-[22px] bg-[#18191b] border border-[#26282c] hover:border-[#383b42] transition-all flex flex-col justify-between space-y-4 shadow-sm hover:shadow-md"
-                  >
-                    {/* Top Row: Stars, Badge, Published Date */}
-                    <div className="space-y-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        {/* 5 Stars */}
-                        <div className="flex items-center gap-1 text-[#ea580c]">
-                          {[...Array(item.rating || 5)].map((_, i) => (
-                            <Star key={i} className="w-3.5 h-3.5 fill-[#ea580c]" />
-                          ))}
-                        </div>
+                {pageItems.map((item) => {
+                  const isExpanded = Boolean(expandedReviews[item.id]);
+                  const isLongQuote = item.quote.length > 180;
 
-                        {/* Badges container */}
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          {item.highlight && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/25">
-                              <Sparkles className="w-2.5 h-2.5" />
-                              {item.highlight}
-                            </span>
-                          )}
-
-                          {item.publishedAt && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-neutral-400 bg-[#222428] px-2 py-0.5 rounded-full border border-[#2e3137]">
-                              <Clock className="w-2.5 h-2.5" />
-                              {item.publishedAt}
-                            </span>
-                          )}
-
-                          {item.context && !item.publishedAt && (
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 bg-[#222428] px-2.5 py-0.5 rounded-full border border-[#2e3137]">
-                              {item.context}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Quote text */}
-                      <p className="text-xs sm:text-sm text-neutral-200 leading-relaxed font-normal line-clamp-6">
-                        "{item.quote}"
-                      </p>
-                    </div>
-
-                    {/* Author & Service Footer */}
-                    <div className="pt-3 border-t border-[#26282c] flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        {item.photoUrl ? (
-                          <img
-                            src={item.photoUrl}
-                            alt={item.authorName}
-                            className="w-9 h-9 rounded-full object-cover border border-[#26282c]"
-                          />
-                        ) : (
-                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#2a2c30] to-[#1e2023] border border-[#33363c] flex items-center justify-center text-white font-bold text-xs shadow-inner">
-                            {item.authorName.charAt(0)}
+                  return (
+                    <div
+                      key={item.id}
+                      className="p-4 sm:p-5 rounded-[20px] bg-black/25 backdrop-blur-md border border-white/15 hover:border-white/25 transition-all flex flex-col justify-between space-y-3.5 shadow-md"
+                    >
+                      {/* Top Row: 5 Stars & Tags */}
+                      <div className="space-y-2.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          {/* 5 Stars */}
+                          <div className="flex items-center gap-1 text-amber-400">
+                            {[...Array(item.rating || 5)].map((_, i) => (
+                              <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                            ))}
                           </div>
-                        )}
 
-                        <div className="min-w-0">
-                          <h4 className="font-bold text-xs sm:text-sm text-white truncate flex items-center gap-1">
-                            <span>{item.authorName}</span>
-                            <span title="Avaliação Verificada" className="inline-flex items-center">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
-                            </span>
-                          </h4>
-                          <p className="text-[11px] text-[#8e939b] truncate">
-                            {item.petInfo}
+                          {/* Badges container */}
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {item.highlight && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/25">
+                                <Sparkles className="w-2.5 h-2.5" />
+                                {item.highlight}
+                              </span>
+                            )}
+
+                            {item.publishedAt && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-neutral-400 bg-white/5 px-2 py-0.5 rounded-full border border-white/10">
+                                <Clock className="w-2.5 h-2.5" />
+                                {item.publishedAt}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Quote text with expand option */}
+                        <div className="space-y-1.5">
+                          <p
+                            className={`text-xs sm:text-sm text-neutral-200 leading-relaxed font-normal ${
+                              !isExpanded && isLongQuote ? 'line-clamp-4' : ''
+                            }`}
+                          >
+                            "{item.quote}"
                           </p>
+
+                          {isLongQuote && (
+                            <button
+                              type="button"
+                              onClick={() => toggleExpandReview(item.id)}
+                              className="text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 transition-colors inline-block cursor-pointer pt-0.5"
+                            >
+                              {isExpanded ? 'Recolher avaliação' : 'Ler avaliação completa'}
+                            </button>
+                          )}
                         </div>
                       </div>
 
-                      {item.service && (
-                        <span className="hidden xl:inline-block text-[10px] text-neutral-400 bg-[#202226] px-2 py-0.5 rounded-md border border-[#2d3036] shrink-0">
-                          {item.service}
-                        </span>
-                      )}
+                      {/* Author & Service Footer */}
+                      <div className="pt-2.5 border-t border-white/10 flex items-center justify-between gap-2.5">
+                        <div className="flex items-center gap-2.5">
+                          {item.photoUrl ? (
+                            <img
+                              src={item.photoUrl}
+                              alt={item.authorName}
+                              loading="lazy"
+                              className="w-8 h-8 rounded-full object-cover border border-white/20 shrink-0"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#4a0d24] to-[#250410] border border-white/20 flex items-center justify-center text-white font-bold text-xs shrink-0">
+                              {item.authorName.charAt(0)}
+                            </div>
+                          )}
+
+                          <div className="min-w-0">
+                            <h4 className="font-bold text-xs sm:text-sm text-white truncate flex items-center gap-1">
+                              <span>{item.authorName}</span>
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            </h4>
+                            <p className="text-[11px] text-neutral-300/80 truncate">
+                              {item.petInfo}
+                            </p>
+                          </div>
+                        </div>
+
+                        {item.service && (
+                          <span className="hidden xs:inline-block text-[10px] text-neutral-300 bg-white/5 px-2 py-0.5 rounded-md border border-white/10 shrink-0">
+                            {item.service}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             );
           })}
         </div>
       </div>
 
-      {/* Dots and Page Indicator */}
+      {/* Dots and Controls */}
       <div className="flex items-center justify-between pt-1">
         <div className="flex items-center gap-1.5">
           {Array.from({ length: totalPages }).map((_, idx) => (
             <button
               key={idx}
               onClick={() => setCurrentIndex(idx)}
-              aria-label={`Ir para slide ${idx + 1}`}
-              className={`h-1.5 rounded-full transition-all duration-300 ${
+              aria-label={`Ir para avaliação ${idx + 1}`}
+              className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
                 idx === currentIndex
-                  ? 'w-6 bg-[#ea580c]'
-                  : 'w-2 bg-[#2a2d33] hover:bg-[#3d424b]'
+                  ? 'w-6 bg-emerald-500'
+                  : 'w-2 bg-white/20 hover:bg-white/40'
               }`}
             />
           ))}
         </div>
 
-        <div className="flex items-center gap-2 text-[11px] text-[#8e939b]">
+        <div className="flex items-center gap-2 text-[11px] text-neutral-400">
           <button
             onClick={() => setIsPaused(!isPaused)}
-            className="flex items-center gap-1 hover:text-white transition-colors"
+            className="flex items-center gap-1 hover:text-white transition-colors cursor-pointer"
             title={isPaused ? 'Retomar reprodução automática' : 'Pausar reprodução automática'}
           >
-            {isPaused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
+            {isPaused ? <Play className="w-3 h-3 text-emerald-400" /> : <Pause className="w-3 h-3" />}
             <span className="hidden sm:inline">{isPaused ? 'Pausado' : 'Automático'}</span>
           </button>
           <span>•</span>
           <span>
-            {currentIndex + 1} de {totalPages}
+            {currentIndex + 1} / {totalPages}
           </span>
         </div>
       </div>

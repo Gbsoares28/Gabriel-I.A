@@ -1,4 +1,3 @@
-import { GoogleGenAI } from '@google/genai';
 import {
   ChannelItem,
   Product,
@@ -45,10 +44,10 @@ function makeWaUrl(text: string): string {
 }
 
 /**
- * Normalizes text for robust intent and keyword detection
+ * Normalizes text for intent and keyword detection
  */
 function normalize(str: string): string {
-  return str
+  return (str || '')
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -56,16 +55,27 @@ function normalize(str: string): string {
 }
 
 /**
- * Intelligent State Extractor
- * Reads full conversation history in chronological order, extracting and updating
- * animals, ages, breeds, behaviors, timing, neighborhood and confirmation status.
+ * Robust Pre-Attendance State Machine & Context Extractor
+ * Tracks chronological conversation history, extracting all data progressively without loops.
  */
 export function extractPreAttendanceState(messages: Message[]): PreAttendanceCase {
   const userMessages = messages.filter(m => m.role === 'user').map(m => m.content);
+  const assistantMessages = messages.filter(m => m.role === 'assistant').map(m => m.content);
   const fullUserText = userMessages.join(' ');
   const normFull = normalize(fullUserText);
   const lastUserMsg = userMessages[userMessages.length - 1] || '';
   const normLast = normalize(lastUserMsg);
+  const lastAssistantMsg = assistantMessages[assistantMessages.length - 1] || '';
+  const normLastAssistant = normalize(lastAssistantMsg);
+
+  // Track which questions the assistant has ALREADY asked to strictly prevent loops
+  const askedQuestions = {
+    animals: normLastAssistant.includes('como se chamam') || normLastAssistant.includes('qual é o nome e a idade') || normLastAssistant.includes('como você prefere chamar'),
+    duration: normLastAssistant.includes('há quanto tempo') || normLastAssistant.includes('ha quanto tempo') || normLastAssistant.includes('tempo de convivência'),
+    behavior: normLastAssistant.includes('o que costuma acontecer') || normLastAssistant.includes('quais são os estímulos') || normLastAssistant.includes('momentos do passeio') || normLastAssistant.includes('costuma observar'),
+    neighborhood: normLastAssistant.includes('em qual bairro') || normLastAssistant.includes('qual bairro') || normLastAssistant.includes('sua região'),
+    confirmation: normLastAssistant.includes('está tudo correto') || normLastAssistant.includes('esta tudo correto') || normLastAssistant.includes('resumo do caso')
+  };
 
   // 1. Detect species
   let species: 'Gatos' | 'Cães' | 'Outro' | undefined = undefined;
@@ -82,8 +92,8 @@ export function extractPreAttendanceState(messages: Message[]): PreAttendanceCas
     normFull.includes('cao') ||
     normFull.includes('caes') ||
     normFull.includes('cadela') ||
-    normFull.includes('filhote') ||
     normFull.includes('latido') ||
+    normFull.includes('latir') ||
     normFull.includes('passeio') ||
     normFull.includes('guia') ||
     normFull.includes('puxar');
@@ -93,37 +103,35 @@ export function extractPreAttendanceState(messages: Message[]): PreAttendanceCas
   } else if (hasDog && !hasCat) {
     species = 'Cães';
   } else if (hasCat && hasDog) {
-    species = normLast.includes('gato') || normLast.includes('gata') ? 'Gatos' : 'Cães';
+    species = normFull.includes('gato') || normFull.includes('gata') ? 'Gatos' : 'Cães';
   }
 
-  // 2. Extract animals (names, ages, breed)
+  // 2. Extract animals (multi-animal or single animal)
   const animals: AnimalInfo[] = [];
 
-  // Match pattern: "mais velha é a Bella, tem 7 anos" or "a Bella, de 7 anos"
-  // Multi-animal extraction (e.g. Bella e Diana)
-  const bellaMatch = fullUserText.match(/\bBella\b[^\.\n,]*(?:tem|de)?\s*(\d+)\s*(?:anos|ano)?/i);
-  const dianaMatch = fullUserText.match(/\bDiana\b[^\.\n,]*(?:tem|de)?\s*(\d+)\s*(?:meses|mes|anos|ano)?/i);
+  // Match: "Bella tem 7 anos" / "a Bella, de 7 anos" / "Bella, 7 anos"
+  const bellaMatch = fullUserText.match(/\bBella\b[^0-9]{0,35}(\d+)\s*(meses|mes|anos|ano)/i);
+  const dianaMatch = fullUserText.match(/\bDiana\b[^0-9]{0,35}(\d+)\s*(meses|mes|anos|ano)/i);
 
   if (bellaMatch || dianaMatch) {
     if (bellaMatch) {
       animals.push({
         name: 'Bella',
-        age: bellaMatch[1] ? `${bellaMatch[1]} anos` : '7 anos',
+        age: `${bellaMatch[1]} ${bellaMatch[2].toLowerCase()}`,
         species: 'Gato',
         breed: normFull.includes('sem raca definida') || normFull.includes('srd') ? 'sem raça definida' : undefined
       });
     }
     if (dianaMatch) {
-      const unit = fullUserText.match(/diana[^\.\n,]*\d+\s*anos/i) ? 'anos' : 'meses';
       animals.push({
         name: 'Diana',
-        age: dianaMatch[1] ? `${dianaMatch[1]} ${unit}` : '4 meses',
+        age: `${dianaMatch[1]} ${dianaMatch[2].toLowerCase()}`,
         species: 'Gato',
         breed: normFull.includes('sem raca definida') || normFull.includes('srd') ? 'sem raça definida' : undefined
       });
     }
   } else {
-    // Generic regex for single pet: "O Thor tem 2 anos", "Meu cão Max, 3 anos", etc.
+    // Generic regex for pets: "O Thor tem 2 anos", "Thor, Golden Retriever, 2 anos", etc.
     const genericNameAge = fullUserText.match(
       /(?:meu|minha|o|a)?\s*([A-ZÁÉÍÓÚÂÊÎÔÛ][a-záéíóúâêîôû]{2,15})[^\.\n,]{0,25}?(?:tem|de|\,)?\s*(\d+(?:[,\.]\d+)?)\s*(anos|ano|meses|mes)/i
     );
@@ -131,8 +139,7 @@ export function extractPreAttendanceState(messages: Message[]): PreAttendanceCas
       const name = genericNameAge[1];
       const ageNum = genericNameAge[2];
       const ageUnit = genericNameAge[3].toLowerCase();
-      // Filter out non-names like "Meu", "Tenho", "Ela", "Ele", "Aqui"
-      if (!['Tenho', 'Meu', 'Minha', 'Ela', 'Ele', 'Aqui', 'Como', 'Quando', 'Hoje'].includes(name)) {
+      if (!['Tenho', 'Meu', 'Minha', 'Ela', 'Ele', 'Aqui', 'Como', 'Quando', 'Hoje', 'Sim', 'Nao'].includes(name)) {
         animals.push({
           name,
           age: `${ageNum} ${ageUnit}`,
@@ -142,7 +149,7 @@ export function extractPreAttendanceState(messages: Message[]): PreAttendanceCas
     }
   }
 
-  // Handle corrections (Test E): e.g. "A idade da Bella está errada. Ela tem 8 anos."
+  // Handle corrections (e.g. "A idade da Bella está errada. Ela tem 8 anos.")
   for (const msg of userMessages) {
     const correctionMatch = msg.match(/(?:idade\s+da\s+(\w+)|(\w+))\s*(?:está errada|nao tem|tem na verdade|tem)\.?\s*(?:ela\s+tem|ele\s+tem|tem)?\s*(\d+)\s*(anos|ano|meses|mes)/i);
     if (correctionMatch) {
@@ -174,7 +181,7 @@ export function extractPreAttendanceState(messages: Message[]): PreAttendanceCas
     detectedBreed = 'Shih Tzu';
   } else if (normFull.includes('poodle')) {
     detectedBreed = 'Poodle';
-  } else if (normFull.includes('siames')) {
+  } else if (normFull.includes('siames') || normFull.includes('siamesa')) {
     detectedBreed = 'Siamês';
   }
 
@@ -214,17 +221,14 @@ export function extractPreAttendanceState(messages: Message[]): PreAttendanceCas
   if (normFull.includes('bufada') || normFull.includes('bufando')) behaviors.push('bufadas');
   if (normFull.includes('pula') || normFull.includes('pulando')) behaviors.push('pulos');
   if (normFull.includes('destroi') || normFull.includes('destruicao')) behaviors.push('destruição de objetos');
-  if (normFull.includes('late na janela') || normFull.includes('campainha') || normFull.includes('portao')) behaviors.push('latidos com gatilhos externos (janela/campainha/portão)');
+  if (normFull.includes('late na janela') || normFull.includes('campainha') || normFull.includes('portao')) behaviors.push('latidos com estímulos externos (janela/campainha/portão)');
 
   if (behaviors.length > 0) {
     behaviorDetails = behaviors.join(', ');
   } else {
-    // If user described something specific in turns 2-4
-    for (const msg of userMessages.slice(1)) {
-      if (msg.length > 15 && !msg.match(/copacabana|tijuca|barra|bairro|anos|meses/i)) {
-        behaviorDetails = msg;
-        break;
-      }
+    // If the assistant just asked about behaviors and the user replied
+    if (askedQuestions.behavior && lastUserMsg.length > 2) {
+      behaviorDetails = lastUserMsg.trim().replace(/^["']|["']$/g, '');
     }
   }
 
@@ -239,6 +243,15 @@ export function extractPreAttendanceState(messages: Message[]): PreAttendanceCas
     onsetOrDuration = 'há 1 mês';
   } else if (normFull.includes('desde filhote')) {
     onsetOrDuration = 'desde filhote';
+  } else if (normFull.includes('sempre')) {
+    onsetOrDuration = 'desde que chegou';
+  } else if (askedQuestions.duration) {
+    // User answered the duration question (even if short like "não sei" or "pouco tempo")
+    if (normLast.includes('nao sei') || normLast.includes('nao lembro')) {
+      onsetOrDuration = 'não especificado';
+    } else if (lastUserMsg.trim().length > 0) {
+      onsetOrDuration = lastUserMsg.trim();
+    }
   }
 
   // 6. Neighborhood (Bairro)
@@ -259,52 +272,41 @@ export function extractPreAttendanceState(messages: Message[]): PreAttendanceCas
     }
   }
 
-  // Check if user answered neighborhood directly to the prompt "em qual bairro você mora?"
-  const lastAssistantMsg = [...messages].reverse().find(m => m.role === 'assistant')?.content || '';
-  if (normalize(lastAssistantMsg).includes('em qual bairro') || normalize(lastAssistantMsg).includes('qual bairro')) {
-    const cleanedAnswer = lastUserMsg.trim().replace(/[\.\,\!]/g, '');
-    const normAns = normalize(cleanedAnswer);
-    if (
-      !normAns.includes('nao') &&
-      !normAns.includes('prefiro') &&
-      !normAns.includes('online') &&
-      !normAns.includes('sei la') &&
-      cleanedAnswer.length >= 3 &&
-      cleanedAnswer.length <= 40
-    ) {
-      neighborhood = cleanedAnswer;
+  // If assistant asked for neighborhood and user replied with their neighborhood or city
+  if (!neighborhood && askedQuestions.neighborhood) {
+    const cleanBairro = lastUserMsg.trim().replace(/[\.\,\!]/g, '');
+    const normB = normalize(cleanBairro);
+    if (normB.includes('nao sei') || normB.includes('prefiro nao') || normB.includes('online')) {
+      neighborhood = 'atendimento online / a combinar';
+    } else if (cleanBairro.length >= 3 && cleanBairro.length <= 40) {
+      neighborhood = cleanBairro;
     }
   }
 
-  // 7. Missing Information List
-  const missingInformation: string[] = [];
-  if (animals.length === 0) missingInformation.push('animals_and_ages');
-  if (!onsetOrDuration && (primaryProblem?.includes('Conflito') || primaryProblem?.includes('Puxar'))) {
-    missingInformation.push('onset_or_duration');
-  }
-  if (!behaviorDetails) missingInformation.push('behavior_details');
-  if (!neighborhood) missingInformation.push('neighborhood');
-
-  // 8. Confirmation status
+  // 7. Confirmation Status
   let confirmationStatus: 'none' | 'pending' | 'confirmed' | 'correcting' = 'none';
-  const hasAskedConfirmation = normalize(lastAssistantMsg).includes('esta tudo correto');
+  const cleanLast = normLast.replace(/[\.\,\!\?]/g, '').trim();
 
-  if (hasAskedConfirmation) {
+  if (askedQuestions.confirmation) {
     if (
-      normLast === 'sim, esta correto' ||
-      normLast === 'esta correto' ||
-      normLast === 'sim' ||
-      normLast === 'correto' ||
-      normLast === 'perfeito' ||
-      normLast.includes('pode enviar') ||
-      normLast.includes('esta certo')
+      cleanLast === 'sim esta correto' ||
+      cleanLast === 'sim esta certo' ||
+      cleanLast === 'esta correto' ||
+      cleanLast === 'sim' ||
+      cleanLast === 'correto' ||
+      cleanLast === 'perfeito' ||
+      cleanLast === 'isso mesmo' ||
+      cleanLast.includes('pode enviar') ||
+      cleanLast.includes('esta certo') ||
+      cleanLast.includes('esta correto') ||
+      cleanLast.startsWith('sim')
     ) {
       confirmationStatus = 'confirmed';
     } else if (
-      normLast.includes('corrigir') ||
-      normLast.includes('errada') ||
-      normLast.includes('errado') ||
-      normLast.includes('na verdade')
+      cleanLast.includes('corrigir') ||
+      cleanLast.includes('errada') ||
+      cleanLast.includes('errado') ||
+      cleanLast.includes('na verdade')
     ) {
       confirmationStatus = 'correcting';
     } else {
@@ -312,42 +314,46 @@ export function extractPreAttendanceState(messages: Message[]): PreAttendanceCas
     }
   }
 
-  // 9. Step calculation
+  // 8. Step Calculation
   let step: PreAttendanceCase['step'] = 'questioning';
-  if (
-    normLast.includes('prefiro falar diretamente') ||
-    normLast.includes('falar diretamente com gabriel') ||
+  const isDirectContact =
+    normLast.includes('falar diretamente') ||
+    normLast.includes('falar direto') ||
     normLast.includes('falar com gabriel') ||
+    normLast.includes('falar no whatsapp') ||
+    normLast.includes('direto no whatsapp') ||
+    normLast.includes('contato direto') ||
     normLast.includes('contato imediato') ||
-    normLast.includes('ir para o whatsapp')
-  ) {
+    normLast.includes('ir para o whatsapp') ||
+    (normLast.includes('whatsapp') && (normLast.includes('falar') || normLast.includes('chamar') || normLast.includes('conversar')));
+
+  if (isDirectContact) {
     step = 'immediate_contact';
   } else if (confirmationStatus === 'confirmed') {
     step = 'ready_for_whatsapp';
-  } else if (hasAskedConfirmation && confirmationStatus === 'correcting') {
+  } else if (askedQuestions.confirmation && confirmationStatus === 'correcting') {
     step = 'awaiting_confirmation';
-  } else if (hasAskedConfirmation) {
+  } else if (askedQuestions.confirmation) {
     step = 'awaiting_confirmation';
-  } else if (animals.length > 0 && behaviorDetails && onsetOrDuration && !neighborhood) {
-    step = 'awaiting_neighborhood';
+  } else if (animals.length > 0 && (behaviorDetails || onsetOrDuration) && neighborhood) {
+    step = 'awaiting_confirmation';
   }
 
-  // 10. Summary description
+  // 9. Format WhatsApp summary & messages
+  const animalListStr =
+    animals.length > 0
+      ? animals.map(a => `${a.name || 'Pet'}${a.age ? `, ${a.age}` : ''}${a.breed ? ` (${a.breed})` : ''}`).join(' e ')
+      : undefined;
+
   let conversationSummary: string | undefined = undefined;
   if (animals.length > 0 || primaryProblem) {
     const animalNames = animals.map(a => `${a.name}${a.age ? ` (${a.age})` : ''}`).join(' e ');
     conversationSummary = `Tutor relatou ${primaryProblem?.toLowerCase() || 'dificuldades de comportamento'}${
       animalNames ? ` envolvendo ${animalNames}` : ''
-    }${behaviorDetails ? `, com episódios de ${behaviorDetails}` : ''}${
+    }${behaviorDetails ? `, com ${behaviorDetails}` : ''}${
       onsetOrDuration ? ` (${onsetOrDuration})` : ''
-    }. Solicita avaliação e orientações de manejo com Gabriel.`;
+    }.`;
   }
-
-  // 11. Format WhatsApp message and URL
-  const animalListStr =
-    animals.length > 0
-      ? animals.map(a => `${a.name || 'Pet'}${a.age ? `, ${a.age}` : ''}${a.breed ? ` (${a.breed})` : ''}`).join(' e ')
-      : undefined;
 
   const prefilledWhatsAppMessage = buildPreAttendanceMessage({
     species: species || 'Cães e Gatos',
@@ -355,7 +361,7 @@ export function extractPreAttendanceState(messages: Message[]): PreAttendanceCas
     primaryProblem: primaryProblem,
     behaviorDetails: behaviorDetails,
     onsetOrDuration: onsetOrDuration,
-    householdContext: onsetOrDuration ? `Tempo relatado: ${onsetOrDuration}` : undefined,
+    householdContext: onsetOrDuration,
     neighborhood: neighborhood,
     conversationSummary: conversationSummary
   });
@@ -366,13 +372,19 @@ export function extractPreAttendanceState(messages: Message[]): PreAttendanceCas
     primaryProblem: primaryProblem,
     behaviorDetails: behaviorDetails,
     onsetOrDuration: onsetOrDuration,
-    householdContext: onsetOrDuration ? `Tempo relatado: ${onsetOrDuration}` : undefined,
+    householdContext: onsetOrDuration,
     neighborhood: neighborhood,
     conversationSummary: conversationSummary
   });
 
+  const missingInformation: string[] = [];
+  if (animals.length === 0) missingInformation.push('animals_and_ages');
+  if (!onsetOrDuration) missingInformation.push('onset_or_duration');
+  if (!behaviorDetails) missingInformation.push('behavior_details');
+  if (!neighborhood) missingInformation.push('neighborhood');
+
   return {
-    species: species,
+    species,
     animals,
     primaryProblem,
     behaviorDetails,
@@ -399,10 +411,8 @@ function buildStructuredSolutions(
   customWaUrl?: string
 ): SolutionOption[] {
   const queryClean = userPrompt.trim() || 'meu pet';
-  const waChannel = activeChannels.find(c => c.id === 'whatsapp');
   const petflowChannel = activeChannels.find(c => c.id === 'petflow360');
   const youtubeChannel = activeChannels.find(c => c.id === 'youtube');
-  const mentoriaChannel = activeChannels.find(c => c.id === 'mentoria');
 
   const defaultWaCat = makeWaUrl(
     `Olá, Gabriel! Acessei seu site e gostaria de conversar sobre o comportamento do meu gato. Minha dúvida é: ${queryClean}. Você pode me orientar sobre os próximos passos?`
@@ -577,8 +587,53 @@ function buildStructuredSolutions(
 }
 
 /**
+ * Builds the formatted "Resumo do caso" markdown block
+ */
+function buildSummaryMessage(state: PreAttendanceCase): string {
+  const lines: string[] = ['**Resumo do caso**'];
+
+  // Animais
+  if (state.animals && state.animals.length > 0) {
+    const desc = state.animals
+      .map(a => `${a.name}${a.age ? `, ${a.age}` : ''}`)
+      .join(' e ');
+    lines.push(`- Animais: ${desc}`);
+  }
+
+  // Espécie
+  if (state.species) {
+    lines.push(`- Espécie: ${state.species.toLowerCase()}`);
+  }
+
+  // Raça
+  const breed = state.animals.find(a => a.breed)?.breed;
+  if (breed) {
+    lines.push(`- Raça: ${breed}, conforme informado`);
+  }
+
+  // Tempo de convivência / início
+  if (state.onsetOrDuration && state.onsetOrDuration !== 'não especificado') {
+    lines.push(`- Tempo de convivência: ${state.onsetOrDuration}`);
+  }
+
+  // Situação e comportamentos
+  if (state.behaviorDetails) {
+    lines.push(`- Situação relatada: ${state.behaviorDetails}`);
+  } else if (state.primaryProblem) {
+    lines.push(`- Situação relatada: ${state.primaryProblem.toLowerCase()}`);
+  }
+
+  // Bairro
+  if (state.neighborhood && state.neighborhood.trim()) {
+    lines.push(`- Bairro: ${state.neighborhood.trim()}`);
+  }
+
+  return lines.join('\n');
+}
+
+/**
  * Main Consultation Processor
- * Orchestrates the progressive pre-attendance flow and intent classification.
+ * Orchestrates anti-loop progressive state transitions.
  */
 export async function processConsultation(
   messages: Message[],
@@ -588,9 +643,12 @@ export async function processConsultation(
 ): Promise<ConsultationResponse> {
   const lastUserMessage = [...messages].reverse().find(m => m.role === 'user')?.content || '';
   const normLast = normalize(lastUserMessage);
+  const assistantMessages = messages.filter(m => m.role === 'assistant').map(m => m.content);
+  const lastAssistantMsg = assistantMessages[assistantMessages.length - 1] || '';
+  const normLastAssistant = normalize(lastAssistantMsg);
 
   // 1. NON-ANIMAL INTENTS (Mentorship, Pure PetFlow Query, Free PDF)
-  // Mentorship: no pet questions!
+  // Mentorship
   const isMentorshipIntent =
     normLast.includes('mentoria') ||
     normLast.includes('quero ser adestrador') ||
@@ -672,10 +730,10 @@ export async function processConsultation(
     };
   }
 
-  // 2. EXTRACT PRE-ATTENDANCE STATE ACROSS TURNS
+  // 2. EXTRACT PROGRESSIVE PRE-ATTENDANCE STATE ACROSS TURNS
   const state = extractPreAttendanceState(messages);
 
-  // TEST D: Immediate Contact Requested
+  // IMMEDIATE CONTACT REQUEST (User asks to talk directly to Gabriel or go to WhatsApp)
   if (state.step === 'immediate_contact') {
     const solutions = buildStructuredSolutions(
       state.species === 'Gatos' ? 'cat' : 'dog',
@@ -687,7 +745,7 @@ export async function processConsultation(
     return {
       status: 'ready_for_whatsapp',
       message:
-        'Perfeito! Vou te encaminhar diretamente para o WhatsApp do Gabriel agora mesmo com as informações que já organizamos aqui.',
+        'Perfeito! Vou te encaminhar diretamente para o WhatsApp do Gabriel agora mesmo com as informações organizadas aqui.',
       whatsappButton: {
         text: 'Falar com Gabriel no WhatsApp',
         url: state.whatsappUrl || makeWaUrl('Olá, Gabriel! Vim pelo assistente virtual do seu site.')
@@ -706,7 +764,7 @@ export async function processConsultation(
     };
   }
 
-  // STEP 9 & 10: Confirmation Confirmed
+  // SUMMARY CONFIRMATION CONFIRMED
   if (state.confirmationStatus === 'confirmed') {
     const solutions = buildStructuredSolutions(
       state.species === 'Gatos' ? 'cat' : 'dog',
@@ -718,7 +776,7 @@ export async function processConsultation(
     return {
       status: 'ready_for_whatsapp',
       message:
-        'Seu resumo está pronto. Ao continuar, você abrirá uma conversa com Gabriel e poderá enviar as informações que compartilhou aqui.',
+        'Seu resumo está pronto. Ao continuar, você abrirá uma conversa no WhatsApp com Gabriel e poderá enviar as informações que compartilhou aqui.',
       whatsappButton: {
         text: 'Continuar atendimento no WhatsApp',
         url: state.whatsappUrl || makeWaUrl('Olá, Gabriel! Vim pelo assistente virtual do seu site.')
@@ -737,7 +795,7 @@ export async function processConsultation(
     };
   }
 
-  // TEST E: Correction Requested
+  // CORRECTION REQUESTED (e.g. user reports wrong age or name)
   if (state.confirmationStatus === 'correcting' || normLast.includes('idade da bella esta errada')) {
     const summaryText = buildSummaryMessage(state);
     return {
@@ -748,26 +806,32 @@ export async function processConsultation(
     };
   }
 
-  // Check if previous assistant message asked for neighborhood
-  const lastAssistantMsg = [...messages].reverse().find(m => m.role === 'assistant')?.content || '';
-  const justAskedNeighborhood =
-    normalize(lastAssistantMsg).includes('em qual bairro') || normalize(lastAssistantMsg).includes('qual bairro');
+  // Check which questions were previously asked
+  const askedAnimals = assistantMessages.some(m => normalize(m).includes('como se chamam') || normalize(m).includes('qual é o nome e a idade'));
+  const askedDuration = assistantMessages.some(m => normalize(m).includes('há quanto tempo') || normalize(m).includes('tempo de convivência'));
+  const askedBehavior = assistantMessages.some(m => normalize(m).includes('o que costuma acontecer') || normalize(m).includes('quais são os estímulos') || normalize(m).includes('momentos do passeio'));
+  const askedNeighborhood = assistantMessages.some(m => normalize(m).includes('em qual bairro') || normalize(m).includes('qual bairro'));
 
-  // STEP 8: Ready to present Summary for verification
-  if (justAskedNeighborhood || (state.animals.length > 0 && state.behaviorDetails && state.onsetOrDuration && state.neighborhood)) {
+  // If user has provided all critical info (multi-info turn or finished flow), go straight to summary!
+  const hasAnimals = state.animals.length > 0;
+  const hasTiming = Boolean(state.onsetOrDuration) || askedDuration;
+  const hasBehavior = Boolean(state.behaviorDetails) || askedBehavior;
+  const hasLocation = Boolean(state.neighborhood) || askedNeighborhood;
+
+  if (hasAnimals && hasTiming && hasBehavior && hasLocation) {
     const summaryText = buildSummaryMessage(state);
     return {
       status: 'summary_confirmation',
-      message: `Obrigado pelas informações! Vou organizar o que você me contou para facilitar o atendimento com o Gabriel.\n\n${summaryText}\n\nEssas informações ajudam a contextualizar a situação. O Gabriel poderá conversar com você para entender melhor a convivência e avaliar os próximos passos.\n\nEstá tudo correto?`,
+      message: `Obrigado pelas informações! Vou organizar o que você me contou para facilitar o atendimento com o Gabriel.\n\n${summaryText}\n\nEstá tudo correto ou você gostaria de corrigir alguma informação?`,
       quickOptions: ['Sim, está correto', 'Quero corrigir uma informação'],
       preAttendanceCase: state
     };
   }
 
-  // PROGRESSIVE QUESTIONING (One adaptive question at a time)
+  // PROGRESSIVE ONE-QUESTION-AT-A-TIME FLOW (Strictly checks not asked yet)
 
-  // 1. Missing Animals Names / Ages
-  if (state.animals.length === 0) {
+  // 1. Missing Animals and Ages
+  if (!hasAnimals && !askedAnimals) {
     if (state.species === 'Gatos') {
       return {
         status: 'pre_attendance',
@@ -786,7 +850,7 @@ export async function processConsultation(
   }
 
   // 2. Missing Duration / Arrival Time
-  if (!state.onsetOrDuration) {
+  if (!state.onsetOrDuration && !askedDuration) {
     const youngerOrNewer = state.animals[1]?.name || state.animals[0]?.name || 'o pet';
     if (state.species === 'Gatos') {
       return {
@@ -797,14 +861,14 @@ export async function processConsultation(
     } else {
       return {
         status: 'pre_attendance',
-        message: `Obrigado pelas informações! Há quanto tempo esse comportamento vem acontecendo com ${state.animals[0]?.name || 'seu cão'} e com que frequência ele se repete?`,
+        message: `Obrigado pelas informações! Há quanto tempo esse comportamento vem acontecendo com ${state.animals[0]?.name || 'seu cão'}?`,
         preAttendanceCase: state
       };
     }
   }
 
   // 3. Missing Specific Behavior Details
-  if (!state.behaviorDetails) {
+  if (!state.behaviorDetails && !askedBehavior) {
     if (state.species === 'Gatos') {
       return {
         status: 'pre_attendance',
@@ -836,17 +900,17 @@ export async function processConsultation(
     }
   }
 
-  // 4. Missing Neighborhood (Localização)
-  if (!state.neighborhood) {
+  // 4. Missing Neighborhood
+  if (!state.neighborhood && !askedNeighborhood) {
     return {
       status: 'pre_attendance',
       message:
-        'Entendi. E em qual bairro você mora? Assim, o Gabriel poderá avaliar se consegue atender você na sua região.',
+        'Entendi. Em qual bairro você está? Assim posso orientar o próximo passo de acordo com o atendimento disponível.',
       preAttendanceCase: state
     };
   }
 
-  // 5. Final fallback to summary presentation
+  // Fallback: If we have reached here, present summary confirmation directly without looping
   const summaryText = buildSummaryMessage(state);
   return {
     status: 'summary_confirmation',
@@ -854,47 +918,4 @@ export async function processConsultation(
     quickOptions: ['Sim, está correto', 'Quero corrigir uma informação'],
     preAttendanceCase: state
   };
-}
-
-/**
- * Builds the formatted "Resumo do caso" markdown block
- */
-function buildSummaryMessage(state: PreAttendanceCase): string {
-  const lines: string[] = ['**Resumo do caso**'];
-
-  // Animais
-  if (state.animals && state.animals.length > 0) {
-    const desc = state.animals
-      .map(a => `${a.name}${a.age ? `, ${a.age}` : ''}`)
-      .join(' e ');
-    lines.push(`- Animais: ${desc}`);
-  }
-
-  // Raça
-  const breed = state.animals.find(a => a.breed)?.breed;
-  if (breed) {
-    lines.push(`- Raça: ${breed}, conforme informado`);
-  }
-
-  // Situação
-  if (state.primaryProblem) {
-    lines.push(`- Situação: ${state.primaryProblem.toLowerCase()}`);
-  }
-
-  // Comportamentos relatados
-  if (state.behaviorDetails) {
-    lines.push(`- Comportamentos relatados: ${state.behaviorDetails}`);
-  }
-
-  // Chegada / tempo
-  if (state.onsetOrDuration) {
-    lines.push(`- Tempo de convivência / início: ${state.onsetOrDuration}`);
-  }
-
-  // Bairro
-  if (state.neighborhood && state.neighborhood.trim()) {
-    lines.push(`- Bairro: ${state.neighborhood.trim()}`);
-  }
-
-  return lines.join('\n');
 }

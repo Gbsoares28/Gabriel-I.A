@@ -86,10 +86,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
                 {/* Text Bubble */}
                 <div
-                  className={`p-4 sm:p-5 rounded-2xl text-sm sm:text-base leading-relaxed ${
+                  className={`p-4 sm:p-5 rounded-2xl text-xs sm:text-sm leading-relaxed ${
                     isUser
-                      ? 'bg-[#222428] text-white rounded-tr-sm border border-[#2e3137]'
-                      : 'bg-[#18191b] text-neutral-200 rounded-tl-sm border border-[#26282c] shadow-sm'
+                      ? 'bg-[#3d0a20]/90 text-white rounded-tr-sm border border-rose-400/30 shadow-md'
+                      : 'bg-[#1e0712]/90 text-white rounded-tl-sm border border-white/15 shadow-md'
                   }`}
                 >
                   <p className="whitespace-pre-wrap">{message.content}</p>
@@ -241,22 +241,22 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       <div className="sticky bottom-4 z-20 pt-2">
         <form
           onSubmit={handleSubmit}
-          className="relative rounded-2xl bg-[#18191b]/95 backdrop-blur-xl border border-[#26282c] p-2 sm:p-2.5 shadow-2xl focus-within:border-[#ea580c] transition-all"
+          className="relative rounded-2xl bg-[#1e0712]/95 backdrop-blur-xl border border-white/20 p-2 sm:p-2.5 shadow-2xl focus-within:border-emerald-400 transition-all"
         >
           <div className="flex items-center gap-2">
             <input
               type="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="Digite mais detalhes ou tire dúvidas sobre a recomendação..."
+              placeholder="Digite mais detalhes ou responda aqui..."
               disabled={isLoading}
-              className="flex-1 bg-transparent px-3 py-2 text-sm sm:text-base text-white placeholder-neutral-500 focus:outline-none"
+              className="flex-1 bg-transparent px-3 py-2 text-xs sm:text-sm text-white placeholder-neutral-400 focus:outline-none"
             />
             <button
               type="submit"
               disabled={!inputText.trim() || isLoading}
               aria-label="Enviar mensagem"
-              className="w-11 h-11 rounded-xl bg-[#ea580c] hover:bg-[#d9480f] disabled:bg-[#222428] disabled:text-neutral-600 text-white font-medium text-sm transition-all flex items-center justify-center shrink-0 active:scale-95"
+              className="w-11 h-11 rounded-xl bg-[#16a34a] hover:bg-[#15803d] disabled:bg-white/10 disabled:text-neutral-500 text-white font-medium text-sm transition-all flex items-center justify-center shrink-0 active:scale-95 cursor-pointer shadow-md"
             >
               <ArrowRight className="w-4 h-4 text-white" />
             </button>

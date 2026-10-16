@@ -1328,6 +1328,56 @@
       },
       "id": "evt-mvb9tyfy-z77p",
       "timestamp": 1792173504670
+    },
+    {
+      "type": "page_view",
+      "sessionId": "sess_9nw8pt5_mvbedcw1",
+      "metadata": {},
+      "id": "evt-mvbed3od-6xvp",
+      "timestamp": 1792181116381
+    },
+    {
+      "type": "page_view",
+      "sessionId": "sess_9nw8pt5_mvbedcw1",
+      "metadata": {},
+      "id": "evt-mvbef5a1-yf7u",
+      "timestamp": 1792181211769
+    },
+    {
+      "type": "recommendation_viewed",
+      "sessionId": "anon",
+      "metadata": {
+        "channelId": "whatsapp",
+        "channelName": "Contato com o Adestrador",
+        "category": "Material Gratuito",
+        "query": "Quero meu pdf gratuito"
+      },
+      "id": "evt-mvbf6jof-vnst",
+      "timestamp": 1792182490143
+    },
+    {
+      "type": "recommendation_viewed",
+      "sessionId": "anon",
+      "metadata": {
+        "channelId": "mentoria",
+        "channelName": "Mentoria para Adestradores",
+        "category": "Mentoria para Adestradores",
+        "query": "Tenho interesse na mentoria para adestradores"
+      },
+      "id": "evt-mvbf6p2s-3i03",
+      "timestamp": 1792182497140
+    },
+    {
+      "type": "recommendation_viewed",
+      "sessionId": "anon",
+      "metadata": {
+        "channelId": "petflow360",
+        "channelName": "Clube PetFlow 360",
+        "category": "Clube PetFlow 360",
+        "query": "Quero saber se o Clube PetFlow 360 é indicado para a raça e a idade do meu animal."
+      },
+      "id": "evt-mvbf6tvc-3bvm",
+      "timestamp": 1792182503352
     }
   ]
 }

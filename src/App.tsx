@@ -232,10 +232,23 @@ export default function App() {
   const hasActiveChat = messages.length > 0;
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0f1011] text-[#ededed] selection:bg-emerald-500/30 selection:text-emerald-200">
-      {/* Very subtle minimalist ambiance */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[360px] bg-emerald-600/[0.03] rounded-full blur-[160px]"></div>
+    <div className="min-h-screen flex flex-col bg-[#8d272b] text-white selection:bg-emerald-500/30 selection:text-emerald-200 relative">
+      {/* Global Full-Page Background (Exact #8d272b from https://share.google/5hHPp8HXLvxLwgBgw) */}
+      <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden" aria-hidden="true">
+        {/* Exact solid wine tone #8d272b */}
+        <div className="absolute inset-0 bg-[#8d272b]" />
+
+        {/* Soft fabric / photographic texture */}
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-15 mix-blend-overlay scale-100 sm:scale-105 transition-opacity duration-700"
+          style={{
+            backgroundImage: `url('https://i.ibb.co/5hcmPkW2/MG-9611.jpg')`,
+            backgroundAttachment: 'fixed'
+          }}
+        />
+
+        {/* Seamless tonal wine gradient */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#9b2a2f]/40 via-[#8d272b]/50 to-[#781f23]/60 backdrop-blur-[1px]" />
       </div>
 
       {/* Header */}
@@ -248,8 +261,8 @@ export default function App() {
         hasActiveChat={hasActiveChat}
       />
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-8 relative z-10 py-6 sm:py-10 space-y-16 sm:space-y-24">
+      {/* Main Content Area - Mobile First Single Column Spacing */}
+      <main className="flex-1 max-w-5xl w-full mx-auto px-3.5 sm:px-6 lg:px-8 relative z-10 py-4 sm:py-8 space-y-8 sm:space-y-14">
         {!hasActiveChat ? (
           <>
             {/* 1. Hero Consultation Hub */}

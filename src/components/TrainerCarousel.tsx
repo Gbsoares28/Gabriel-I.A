@@ -140,7 +140,7 @@ export const TrainerCarousel: React.FC = () => {
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
-      className="relative w-full max-w-md aspect-[4/5] rounded-[30px] overflow-hidden bg-[#16171a] border border-[#2a2c31] shadow-2xl group focus:outline-none focus:ring-2 focus:ring-[#16a34a]/60 select-none"
+      className="relative w-full max-w-[300px] sm:max-w-md aspect-[4/5] rounded-[22px] sm:rounded-[30px] overflow-hidden bg-[#16171a] border border-white/10 shadow-2xl group focus:outline-none focus:ring-2 focus:ring-[#16a34a]/60 select-none mx-auto"
     >
       {/* Background Images with smooth cross-fade */}
       {TRAINER_PHOTOS.map((photo, index) => {

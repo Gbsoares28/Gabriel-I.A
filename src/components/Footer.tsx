@@ -19,7 +19,7 @@ export const Footer: React.FC<FooterProps> = ({
   const produtosLink = produtos?.link || 'https://drive.google.com/file/d/1-wMqvUYwpDE9f35rRf7Y8ChoP3OCLziS/view?usp=drive_link';
 
   return (
-    <footer className="w-full border-t border-[#222427] bg-[#0c0d0e] py-14 mt-20">
+    <footer className="w-full border-t border-white/15 bg-[#6b1c20]/90 backdrop-blur-md py-10 mt-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-8 space-y-10">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
           {/* Brand & Specialty */}

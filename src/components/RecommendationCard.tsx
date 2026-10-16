@@ -95,12 +95,12 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
         buttonBg: 'bg-[#9333ea] hover:bg-[#7e22ce] text-white shadow-purple-900/40'
       };
     }
-    // PDF or Toy
+    // PDF or Toy (Curadoria Gabriel)
     return {
-      cardBorder: 'border-amber-500/30 hover:border-amber-400/60 shadow-amber-950/20',
-      cardBg: 'bg-[#1b1713]',
-      badgeBg: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-      buttonBg: 'bg-[#f59e0b] hover:bg-[#d97706] text-neutral-950 font-bold shadow-amber-900/40'
+      cardBorder: 'border-rose-500/30 hover:border-rose-400/60 shadow-rose-950/20',
+      cardBg: 'bg-[#1e0a13]',
+      badgeBg: 'bg-white/20 text-white border-white/30',
+      buttonBg: 'bg-[#7a1233] hover:bg-[#8e153c] text-white font-bold shadow-rose-900/40 border border-white/20'
     };
   };
 
